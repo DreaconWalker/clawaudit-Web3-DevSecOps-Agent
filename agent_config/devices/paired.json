@@ -1,0 +1,32 @@
+{
+  "4ef3f2902b14484457c5e43f3ad41404cf9d7c7f9bd562187f3efa2bc3b60784": {
+    "deviceId": "4ef3f2902b14484457c5e43f3ad41404cf9d7c7f9bd562187f3efa2bc3b60784",
+    "publicKey": "np7ZSKUsd-uVXSw11nmKs8EfO4PrWH24tlZcvikUnhQ",
+    "platform": "linux",
+    "clientId": "cli",
+    "clientMode": "cli",
+    "role": "operator",
+    "roles": [
+      "operator"
+    ],
+    "scopes": [
+      "operator.admin",
+      "operator.approvals",
+      "operator.pairing"
+    ],
+    "tokens": {
+      "operator": {
+        "token": "vh8HWcCRZuvddCcb7gJzMS4xAGugS6SjEuetwi2tJBs",
+        "role": "operator",
+        "scopes": [
+          "operator.admin",
+          "operator.approvals",
+          "operator.pairing"
+        ],
+        "createdAtMs": 1771570520062
+      }
+    },
+    "createdAtMs": 1771570520062,
+    "approvedAtMs": 1771570520062
+  }
+}

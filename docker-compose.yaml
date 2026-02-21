@@ -1,0 +1,15 @@
+services:
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: clawaudit_bunker
+    restart: unless-stopped
+    ports:
+      - "18789:18789"
+    environment:
+      - HOST=0.0.0.0
+      - OPENCLAW_HOST=0.0.0.0
+      - OPENCLAW_AUTH_SECRET=bunker_secret_123
+      - GOOGLE_API_KEY=Y***REMOVED***
+    volumes:
+      - ./agent_config:/home/node/.openclaw
+      - ./agent_workspace:/app/workspace

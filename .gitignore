@@ -1,0 +1,28 @@
+# --- Security & Credentials ---
+.env
+credentials.json
+*.pem
+*.key
+
+# --- OpenClaw & Agent Persistence ---
+# We ignore these because they contain your unique agent identity and session history
+agent_config/identity/
+agent_config/logs/
+agent_config/workspace/
+agent_config/canvas/
+openclaw.json.bak*
+update-check.json
+
+# --- Python Environment & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env.example # (Only ignore if you mistakenly put real keys here; usually we keep this)
+
+# --- Docker & System ---
+.DS_Store
+Thumbs.db
+docker-compose.override.yml
