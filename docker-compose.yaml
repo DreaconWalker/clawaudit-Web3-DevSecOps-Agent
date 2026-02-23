@@ -3,6 +3,8 @@ services:
     image: ghcr.io/openclaw/openclaw:latest
     container_name: clawaudit_bunker
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "18789:18789"
     environment:
