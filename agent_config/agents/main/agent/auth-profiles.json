@@ -13,22 +13,12 @@
     }
   },
   "lastGood": {
-    "google": "google:default"
+    "google": "google:manual"
   },
   "usageStats": {
     "google:manual": {
-      "lastUsed": 1771575410723,
-      "errorCount": 1,
-      "failureCounts": {
-        "rate_limit": 1
-      },
-      "lastFailureAt": 1771578190094,
-      "cooldownUntil": 1771578250094
-    },
-    "google:default": {
-      "errorCount": 0,
-      "lastFailureAt": 1771578205738,
-      "lastUsed": 1771578205748
+      "lastUsed": 1771964992773,
+      "errorCount": 0
     }
   }
 }

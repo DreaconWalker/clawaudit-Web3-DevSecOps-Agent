@@ -22,6 +22,9 @@ venv/
 ENV/
 .env.example # (Only ignore if you mistakenly put real keys here; usually we keep this)
 
+# --- Audit attestation (local registry; optional) ---
+data/
+
 # --- Docker & System ---
 .DS_Store
 Thumbs.db

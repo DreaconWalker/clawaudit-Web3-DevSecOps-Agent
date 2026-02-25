@@ -11,7 +11,12 @@ services:
       - HOST=0.0.0.0
       - OPENCLAW_HOST=0.0.0.0
       - OPENCLAW_AUTH_SECRET=bunker_secret_123
-      - GOOGLE_API_KEY=Y***REMOVED***
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_KEY_2=${GEMINI_API_KEY_2}
+      - MOLTBOOK_API_KEY=${MOLTBOOK_API_KEY}
+      - MOLTBOOK_SUBMOLT=${MOLTBOOK_SUBMOLT:-lablab}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - ./agent_config:/home/node/.openclaw
       - ./agent_workspace:/app/workspace

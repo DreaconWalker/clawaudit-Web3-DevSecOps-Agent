@@ -1,1 +1,37 @@
-{"auth":{"profiles":{"anthropic":{"provider":"anthropic","apiKey":"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"}}},"agents":{"defaults":{"model":{"primary":"anthropic/claude-3-5-sonnet-latest"}}}}
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.17",
+    "lastTouchedAt": "2026-02-24T16:33:48.466Z"
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "google/gemini-2.5-flash"
+      },
+      "compaction": {
+        "mode": "safeguard"
+      }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto"
+  },
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "1b1f1358f8d4a84996b6a838937b132f934872db2057ce0a"
+    }
+  },
+  "skills": {
+    "entries": {
+      "moltbook": { "enabled": true },
+      "telegram": { "enabled": true }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": { "enabled": true }
+    }
+  }
+}
