@@ -9,6 +9,7 @@ import logging
 import uuid
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse, urlencode
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from github import Github
@@ -140,6 +141,11 @@ def _get_moltbook_key() -> str:
     return key.strip()
 
 
+def _utc_timestamp() -> str:
+    """Return current UTC timestamp for Moltbook receipts (e.g. 2026-02-28T17:23:00Z)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _post_to_moltbook(title: str, content: str, submolt: str | None = None) -> bool:
     """Post a message to the configured Moltbook submolt. Returns True on success."""
     key = (os.getenv("MOLTBOOK_API_KEY") or "").strip()
@@ -159,6 +165,28 @@ def _post_to_moltbook(title: str, content: str, submolt: str | None = None) -> b
             return True
     except Exception as e:
         logger.warning("Moltbook post failed: %s", e)
+        return False
+
+
+def _send_telegram(message: str) -> bool:
+    """Send a message to the developer via Telegram Bot API. Returns True on success. Uses TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID from env."""
+    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    chat_id = (os.getenv("TELEGRAM_CHAT_ID") or "").strip()
+    if not token or not chat_id:
+        logger.warning("Telegram not sent: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing in .env")
+        return False
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = urlencode({"chat_id": chat_id, "text": message}).encode()
+    req = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            out = json.loads(resp.read().decode())
+            if not out.get("ok"):
+                logger.warning("Telegram API returned not ok: %s", out)
+                return False
+            return True
+    except Exception as e:
+        logger.warning("Telegram post failed: %s", e)
         return False
 
 
@@ -215,6 +243,7 @@ class ScanRequest(BaseModel):
     contract_code: str
     contract_address: str | None = None  # optional; if set, attestation is also queryable by address
     scan_type: str | None = None  # optional: "manual" | "demo" | "full" — agent posts scan-type-specific Moltbook receipt
+    repository_url: str | None = None  # optional; full clone URL (e.g. https://github.com/owner/repo) so agent can reference repo in Telegram/Moltbook
     # Optional overrides for testing from UI; if not set, backend uses TELEGRAM_* and MOLTBOOK_* env vars
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
@@ -256,19 +285,23 @@ def run_scan(req: ScanRequest):
     scan_type_hint = (req.scan_type or "manual").strip().lower()
     if scan_type_hint not in ("manual", "demo", "full"):
         scan_type_hint = "manual"
+    repo_context = ""
+    if req.repository_url and req.repository_url.strip():
+        repo_url = req.repository_url.strip()
+        repo_context = f"\nRepository (include this in Telegram and Moltbook receipts so the developer knows which repo was scanned): {repo_url}\n"
     moltbook_instruction = (
         f'Only after you have completed the audit and sent the Telegram message, use your \'moltbook\' tool to post to the submolt "{submolt}" exactly one short, cryptic public receipt. '
         f'Identify this as a **{scan_type_hint}** security scan in your receipt (e.g. "ClawAudit Sentinel has completed a {scan_type_hint} security scan. ..."). '
-        'Do not post the actual vulnerabilities or code to Moltbook — only this cryptic receipt. Do this step only once the audit is successfully complete.'
+        'Include the current UTC timestamp in the receipt (e.g. [2026-02-28T17:23:00Z]). Do not post the actual vulnerabilities or code to Moltbook — only this cryptic receipt. Do this step only once the audit is successfully complete.'
     )
     prompt = f"""You are an elite Web3 security auditor. Analyze this Solidity code and complete the following steps in order.
-
+{repo_context}
 Code to analyze:
 {req.contract_code}
 
 Step 1 — Console output (for the user's dashboard): Write a full vulnerability report to the console. Include: CRITICAL FINDINGS (type and location), EXPLOIT SCENARIO (how an attacker would exploit it in one sentence), and PATCHED CODE (corrected Solidity). All of this must appear in your reply so it is shown on the page.
 
-Step 2 — Telegram (full audit trail to developer): Use your 'telegram' tool to send the **full audit trail** to the developer channel. The message must include: the complete vulnerability report — vulnerability name(s), severity, locations, exploit scenario, and remediation (patched code or clear fix steps). Send the same level of detail as the console report so the developer has the full audit trail on Telegram. Do not send only a one-line summary.
+Step 2 — Telegram (full audit trail to developer): Use your 'telegram' tool to send the **full audit trail** to the developer channel. The message must include: the complete vulnerability report — vulnerability name(s), severity, locations, exploit scenario, and remediation (patched code or clear fix steps). Send the same level of detail as the console report so the developer has the full audit trail on Telegram. Do not send only a one-line summary. If a repository URL was provided above, include it at the start of your Telegram message so the developer knows which repo was scanned.
 
 Step 3 — Moltbook (cryptic receipt only on success): {moltbook_instruction}
 """
@@ -300,6 +333,10 @@ Step 3 — Moltbook (cryptic receipt only on success): {moltbook_instruction}
 
     if result.returncode == 0 and not _is_rate_limit(result.stdout, result.stderr):
         proof = attest_audit(req.contract_code, result.stdout, req.contract_address)
+        # Backend fallback: always post a cryptic receipt to Moltbook so the user gets a receipt even if OpenClaw didn't run the skill
+        ts = _utc_timestamp()
+        cryptic_receipt = f"[{ts}] ClawAudit Sentinel has completed a {scan_type_hint} security scan. The developer has been alerted via secure channels."
+        _post_to_moltbook("ClawAudit Sentinel", cryptic_receipt, submolt)
         # Include agent stderr so user can see if Telegram/Moltbook tools failed (e.g. credentials missing in container)
         agent_stderr = (result.stderr or "").strip()
         if agent_stderr and ("Telegram" in agent_stderr or "MOLTBOOK" in agent_stderr or "ERROR" in agent_stderr):
@@ -353,8 +390,31 @@ class MoltbookPostRequest(BaseModel):
     content: str
 
 
+def _normalize_repo_name(repo_input: str) -> str:
+    """Accept 'owner/repo' or full git clone URL (https://github.com/owner/repo or .git); return 'owner/repo'."""
+    s = (repo_input or "").strip()
+    if not s:
+        return s
+    # Already owner/repo (no scheme, no path prefix)
+    if "://" not in s and s.count("/") == 1 and not s.startswith("."):
+        return s
+    # https://github.com/owner/repo or https://github.com/owner/repo.git
+    if "github.com" in s:
+        try:
+            parsed = urlparse(s if "://" in s else "https://" + s)
+            path = (parsed.path or "").strip("/")
+            if path.endswith(".git"):
+                path = path[:-4]
+            parts = path.split("/")
+            if len(parts) >= 2:
+                return f"{parts[0]}/{parts[1]}"
+        except Exception:
+            pass
+    return s
+
+
 class RemediationPRRequest(BaseModel):
-    repo_name: str  # e.g. "owner/repo"
+    repo_name: str  # e.g. "owner/repo" or full URL https://github.com/owner/repo
     file_path: str  # path to the vulnerable file in the repo
     patched_code: str  # fixed code from OpenClaw agent
     vulnerability_title: str
@@ -363,16 +423,24 @@ class RemediationPRRequest(BaseModel):
 
 @app.post("/remediation/create-pr")
 def api_create_remediation_pr(req: RemediationPRRequest):
-    """Create a ClawAudit auto-remediation PR from Streamlit (or any client). Uses GitHub API only."""
-    result = create_clawaudit_remediation_pr(
-        repo_name=req.repo_name,
+    """Create a ClawAudit auto-remediation PR from Streamlit (or any client). Uses GitHub API only. repo_name can be 'owner/repo' or full clone URL (https://github.com/owner/repo)."""
+    repo_name = _normalize_repo_name(req.repo_name)
+    if not repo_name:
+        raise HTTPException(status_code=400, detail="repo_name is required (e.g. owner/repo or https://github.com/owner/repo)")
+    result, err_msg = create_clawaudit_remediation_pr(
+        repo_name=repo_name,
         file_path=req.file_path,
         patched_code=req.patched_code,
         vulnerability_title=req.vulnerability_title,
         token=req.token,
     )
     if result is None:
-        raise HTTPException(status_code=400, detail="Failed to create PR (check GITHUB_TOKEN, repo access, and file path).")
+        raise HTTPException(status_code=400, detail=err_msg or "Failed to create PR (check GITHUB_TOKEN, repo access, and file path).")
+    # Notify developer via Moltbook and Telegram after successful remediation PR
+    ts = _utc_timestamp()
+    pr_msg = f"[{ts}] ClawAudit created remediation PR #{result['number']} for {repo_name}: {result['url']}"
+    _post_to_moltbook("ClawAudit Remediation PR", pr_msg)
+    _send_telegram(pr_msg)
     return result
 
 
@@ -428,7 +496,7 @@ def _create_remediation_pr(repo, pr, patched_code: str, sol_filename: str, audit
         base_ref = pr.base.ref
         # Create branch from PR head
         try:
-            repo.create_ref(f"refs/heads/{branch_name}", head_sha)
+            repo.create_git_ref(f"refs/heads/{branch_name}", head_sha)
         except Exception as e:
             if "already exists" in str(e).lower() or "Reference already exists" in str(e):
                 # Branch exists from previous run; skip or update? For simplicity, skip.
@@ -469,16 +537,17 @@ def create_clawaudit_remediation_pr(
     vulnerability_title: str,
     *,
     token: str | None = None,
-) -> dict | None:
+) -> tuple[dict | None, str | None]:
     """
     Autonomously create a Pull Request with patched code using the GitHub API only (no local git).
 
-    Uses GITHUB_TOKEN from environment unless token is passed. Returns PR info dict or None on failure.
+    Uses GITHUB_TOKEN from environment unless token is passed.
+    Returns (result_dict, None) on success, (None, error_message) on failure.
     """
     auth_token = (token or os.getenv("GITHUB_TOKEN") or "").strip()
     if not auth_token:
         logger.error("create_clawaudit_remediation_pr: GITHUB_TOKEN not set")
-        return None
+        return None, "No GitHub token provided. Add a Personal Access Token in the form or set GITHUB_TOKEN in the backend .env. Token needs the 'repo' scope."
 
     try:
         g = Github(auth_token)
@@ -490,7 +559,7 @@ def create_clawaudit_remediation_pr(
 
         branch_name = f"clawaudit-patch-{uuid.uuid4().hex}"
 
-        repo.create_ref(f"refs/heads/{branch_name}", latest_commit_sha)
+        repo.create_git_ref(f"refs/heads/{branch_name}", latest_commit_sha)
 
         file_content = repo.get_contents(file_path, ref=default_branch)
         file_sha = file_content.sha
@@ -511,10 +580,18 @@ def create_clawaudit_remediation_pr(
         )
 
         logger.info("Created ClawAudit remediation PR #%s for %s", new_pr.number, repo.full_name)
-        return {"number": new_pr.number, "url": new_pr.html_url, "branch": branch_name}
+        return {"number": new_pr.number, "url": new_pr.html_url, "branch": branch_name}, None
     except Exception as e:
+        err_msg = str(e)
         logger.exception("create_clawaudit_remediation_pr failed: %s", e)
-        return None
+        # Surface common GitHub API errors
+        if "404" in err_msg or "Not Found" in err_msg:
+            return None, f"Repo or file not found: {err_msg}. Check that the repo exists, you have access, and the file path '{file_path}' exists on the default branch."
+        if "401" in err_msg or "Bad credentials" in err_msg or "credentials" in err_msg.lower():
+            return None, f"Invalid or expired token: {err_msg}. Create a new PAT at GitHub → Settings → Developer settings → Personal access tokens with the 'repo' scope."
+        if "403" in err_msg or "Forbidden" in err_msg:
+            return None, f"Permission denied: {err_msg}. Ensure your PAT has the 'repo' scope (full control of private repos)."
+        return None, err_msg or "Failed to create PR. Check repo access, file path, and token permissions."
 
 
 # --- GitHub Webhook: PR audit and post comment ---
@@ -615,15 +692,21 @@ Code diff to audit:
                 )
             except Exception as e:
                 logger.warning("Could not post remediation link comment: %s", e)
+            # Notify developer via Moltbook and Telegram
+            ts = _utc_timestamp()
+            rem_msg = f"[{ts}] ClawAudit created remediation PR #{remediation['number']} for {repo_full_name} PR #{pr_number}: {remediation['url']}"
+            _post_to_moltbook("ClawAudit Remediation PR", rem_msg)
+            _send_telegram(rem_msg)
     elif patched_code and len(sol_files) != 1:
         logger.info("Skipping auto remediation PR: %s .sol files (need exactly 1)", len(sol_files))
     elif not patched_code:
         logger.info("No patched code block in report; skipping remediation PR")
 
-    # Post scan-type-specific update to Moltbook (PR review completed)
+    # Post scan-type-specific update to Moltbook (PR review completed), with timestamp
+    ts = _utc_timestamp()
     _post_to_moltbook(
         "ClawAudit PR Review",
-        f"PR security review completed for {repo_full_name} PR #{pr_number}. Findings posted on the PR."
+        f"[{ts}] PR security review completed for {repo_full_name} PR #{pr_number}. Findings posted on the PR."
         + (f" Remediation PR: #{remediation['number']}." if remediation else ""),
     )
     return {"status": "ok", "repo": repo_full_name, "pr": pr_number, "remediation_pr": remediation}

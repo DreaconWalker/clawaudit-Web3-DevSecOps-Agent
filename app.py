@@ -216,6 +216,12 @@ contract VulnerableBank {
     with col2:
         st.markdown("### 🧠 AI Auditor Analysis")
         scan_type_ui = st.selectbox("Scan type (Moltbook receipt style)", options=["manual", "demo", "full"], index=0, key="scan_type_ui", help="Manual / demo / full — the agent posts a scan-type-specific cryptic receipt to Moltbook.")
+        repository_url_optional = st.text_input(
+            "Repository URL (optional)",
+            placeholder="https://github.com/owner/repo",
+            key="repo_url",
+            help="Full git clone URL so the agent can reference this repo in Telegram and Moltbook receipts.",
+        )
         contract_address_optional = st.text_input("Contract address (optional)", placeholder="0x... (for attestation by address)", key="addr")
 
         with st.expander("🔑 Test credentials (optional)", expanded=False):
@@ -263,6 +269,8 @@ contract VulnerableBank {
                         payload = {"contract_code": code_to_scan, "scan_type": scan_type_ui}
                         if addr:
                             payload["contract_address"] = addr
+                        if (st.session_state.get("repo_url") or "").strip():
+                            payload["repository_url"] = (st.session_state.get("repo_url") or "").strip()
                         if (st.session_state.get("test_telegram_token") or "").strip():
                             payload["telegram_bot_token"] = (st.session_state.get("test_telegram_token") or "").strip()
                         if (st.session_state.get("test_telegram_chat") or "").strip():
@@ -327,7 +335,8 @@ with tab2_github:
 
     # --- Create remediation PR (credentials + initiate fix) ---
     st.markdown("### 🚨 Create remediation PR (push fix to GitHub)")
-    st.caption("Enter GitHub credentials and patch details to open a PR with the fixed code on your repo. No local git required.")
+    st.caption("Enter GitHub credentials and patch details to open a PR with the fixed code on your repo. No local git required. **This is separate from the webhook** — the webhook runs when a PR is opened; this form creates a new PR with your patched code.")
+    st.info("**Token:** Use a Personal Access Token with **repo** scope (GitHub → Settings → Developer settings → PAT). **File path** must exist on the **default branch** (e.g. `main`) of the repo.")
     with st.expander("GitHub credentials & patch details", expanded=True):
         gh_token = st.text_input(
             "GitHub token (Personal Access Token)",
@@ -338,9 +347,9 @@ with tab2_github:
         )
         repo_name = st.text_input(
             "Repository",
-            placeholder="owner/repo",
+            placeholder="https://github.com/owner/repo or owner/repo",
             key="gh_repo_name",
-            help="Full repo name, e.g. myorg/my-repo or username/repo.",
+            help="Full git clone URL (e.g. https://github.com/owner/repo) or owner/repo. Use the full URL so Telegram and Moltbook receipts can reference the repo.",
         )
         file_path = st.text_input(
             "File path in repo",
@@ -397,11 +406,12 @@ with tab2_github:
     st.markdown("### Webhook URL")
     st.code(webhook_url, language="text")
     st.caption("Use this URL in your GitHub repo: **Settings → Webhooks → Add webhook**.")
+    st.warning("**Tunnel to the FastAPI port (8000), not Streamlit (8501).** If you use Pinggy or ngrok, run `pinggy http 8000` or `ngrok http 8000` so the Payload URL points at your backend. A **405 Method Not Allowed** usually means the tunnel is forwarding to the wrong port (e.g. Streamlit doesn't accept POST /webhook/github).")
     st.markdown("---")
     st.markdown("### Setup steps")
     st.markdown("""
     1. In your repo go to **Settings → Webhooks → Add webhook**.
-    2. **Payload URL:** paste the URL above (your API must be reachable from the internet for GitHub to call it; use a tunnel like ngrok for local testing).
+    2. **Payload URL:** paste the URL above (your API must be reachable from the internet for GitHub to call it; use a tunnel like **Pinggy** or **ngrok** and **tunnel to port 8000** where FastAPI runs).
     3. **Content type:** `application/json`.
     4. **Which events:** choose **Let me select individual events** → enable **Pull requests**.
     5. Save. Add `GITHUB_TOKEN` to your backend `.env` (token needs `repo` scope and permission to write pull request comments).

@@ -21,6 +21,11 @@ GitHub can only call your webhook if it can reach your server.
   3. In another terminal: `ngrok http 8000`
   4. Copy the HTTPS URL ngrok shows (e.g. `https://abc123.ngrok.io`). That is your **webhook base URL** for the next steps.
 
+- **Option C — Local testing with Pinggy**  
+  1. Start your FastAPI backend: `uvicorn main:app --host 0.0.0.0 --port 8000`
+  2. In another terminal: **`pinggy http 8000`** (must be port **8000**, not 8501). Streamlit runs on 8501 and does not have the webhook endpoint — a tunnel to 8501 will return **405 Method Not Allowed** for `POST /webhook/github`.
+  3. Copy the HTTPS URL Pinggy shows (e.g. `https://xxxxx.free.pinggy.link`). Use `https://YOUR_PINGGY_URL/webhook/github` as the Payload URL in GitHub.
+
 ---
 
 ## 2. Add the webhook to your GitHub repo
