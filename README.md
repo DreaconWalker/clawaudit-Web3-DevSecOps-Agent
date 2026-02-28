@@ -7,11 +7,6 @@
 - **Live scan**: Paste Solidity code → get a full vulnerability report, attestation, and optional Moltbook/Telegram posts.
 - **GitHub integration**: Webhook on PR open/sync → audit the diff → post the result as a PR comment.
 - **Audit trail**: Query attestations by code hash or contract address.
-
----
-
-Before making the repo public, see **[docs/OPEN_SOURCE_CHECKLIST.md](docs/OPEN_SOURCE_CHECKLIST.md)** for a safety checklist (secrets, .gitignore, and what to run).
-
 ---
 
 ## Quick start
