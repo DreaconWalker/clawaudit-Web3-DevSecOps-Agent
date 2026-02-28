@@ -10,6 +10,9 @@ agent_config/identity/
 agent_config/logs/
 agent_config/workspace/
 agent_config/canvas/
+# Agent auth is written at runtime from .env; do not commit real keys
+agent_config/agents/main/agent/auth-profiles.json
+agent_config/agents/main/agent/auth.json
 openclaw.json.bak*
 update-check.json
 
@@ -20,7 +23,7 @@ __pycache__/
 .venv/
 venv/
 ENV/
-.env.example # (Only ignore if you mistakenly put real keys here; usually we keep this)
+# .env.example is committed (placeholders only); never put real keys there
 
 # --- Audit attestation (local registry; optional) ---
 data/

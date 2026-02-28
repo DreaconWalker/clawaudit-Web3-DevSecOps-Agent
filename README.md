@@ -1,10 +1,16 @@
 # ClawAudit
 
+![ClawAudit Logo](clawAudit-logo.png)
+
 **Open audit attestation layer: AI-powered security review of Solidity code with verifiable proof, Moltbook receipts, and Telegram alerts.**
 
 - **Live scan**: Paste Solidity code → get a full vulnerability report, attestation, and optional Moltbook/Telegram posts.
 - **GitHub integration**: Webhook on PR open/sync → audit the diff → post the result as a PR comment.
 - **Audit trail**: Query attestations by code hash or contract address.
+
+---
+
+Before making the repo public, see **[docs/OPEN_SOURCE_CHECKLIST.md](docs/OPEN_SOURCE_CHECKLIST.md)** for a safety checklist (secrets, .gitignore, and what to run).
 
 ---
 
@@ -54,6 +60,8 @@ streamlit run app.py
 
 - **API**: http://localhost:8000 (docs at http://localhost:8000/docs)
 - **UI**: http://localhost:8501
+
+A visual demo of the Command Center UI is hosted live at [https://clawaudit-web3-devsecops-agent.streamlit.app/](https://clawaudit-web3-devsecops-agent.streamlit.app/). However, because the OpenClaw agent requires strict local filesystem access for its cryptographic memory logs and secure tool execution, the backend AI engine must be run locally or deployed to an enterprise VPS or own VPS via Docker.
 
 ---
 

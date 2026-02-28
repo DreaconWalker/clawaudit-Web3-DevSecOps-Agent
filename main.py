@@ -98,6 +98,23 @@ def _set_agent_gemini_key(key: str) -> None:
                 json.dump(data, f, indent=2)
         except Exception:
             pass
+    else:
+        # Create from scratch when missing (e.g. fresh clone); file is in .gitignore so secrets aren't committed
+        try:
+            AUTH_PROFILES_PATH.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "version": 1,
+                "profiles": {
+                    "google:manual": {"type": "token", "provider": "google", "token": key},
+                    "google:default": {"type": "api_key", "provider": "google", "key": key},
+                },
+                "lastGood": {"google": "google:manual"},
+                "usageStats": {},
+            }
+            with open(AUTH_PROFILES_PATH, "w") as f:
+                json.dump(data, f, indent=2)
+        except Exception:
+            pass
     # 2) auth.json: OpenClaw may read this; keep it in sync so no stale key is used
     if AUTH_JSON_PATH.exists():
         try:

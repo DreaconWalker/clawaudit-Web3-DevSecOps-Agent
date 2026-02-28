@@ -10,7 +10,8 @@ services:
     environment:
       - HOST=0.0.0.0
       - OPENCLAW_HOST=0.0.0.0
-      - OPENCLAW_AUTH_SECRET=bunker_secret_123
+      # Default secret for dev/open-source; set OPENCLAW_AUTH_SECRET in .env for production
+      - OPENCLAW_AUTH_SECRET=${OPENCLAW_AUTH_SECRET:-your_default_dev_secret}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_API_KEY_2=${GEMINI_API_KEY_2}
       - MOLTBOOK_API_KEY=${MOLTBOOK_API_KEY}

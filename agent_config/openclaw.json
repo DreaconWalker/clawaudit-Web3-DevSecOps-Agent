@@ -20,18 +20,24 @@
   "gateway": {
     "auth": {
       "mode": "token",
-      "token": "1b1f1358f8d4a84996b6a838937b132f934872db2057ce0a"
+      "token": "set_OPENCLAW_AUTH_SECRET_in_env"
     }
   },
   "skills": {
     "entries": {
-      "moltbook": { "enabled": true },
-      "telegram": { "enabled": true }
+      "moltbook": {
+        "enabled": true
+      },
+      "telegram": {
+        "enabled": true
+      }
     }
   },
   "plugins": {
     "entries": {
-      "telegram": { "enabled": true }
+      "telegram": {
+        "enabled": true
+      }
     }
   }
 }
