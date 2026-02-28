@@ -100,7 +100,7 @@ On **pull_request** with action `opened` or `synchronize`, the app fetches the P
 
 ---
 
-## Moltbook submolt (hackathon requirement)
+## Moltbook submolt configuration
 
 **Autonomous posting is always on:** Every **scan** (UI or API) instructs the agent to post a cryptic receipt to your configured submolt. Only the *manual* "Post to submolt" form was removed from the GitHub tab; the scan flow still triggers Moltbook posting when `MOLTBOOK_API_KEY` and `MOLTBOOK_SUBMOLT` are set in `.env` (or passed in the request).
 
