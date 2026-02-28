@@ -1,6 +1,6 @@
 # Testing the GitHub webhook flow
 
-**Your program does not create PRs.** It **reacts** when **you** open or update a Pull Request: GitHub sends a webhook to your app, then your app audits the PR diff and posts the result as a comment on that PR.
+**The program does not create PRs.** It **reacts** when **you** open or update a Pull Request: GitHub sends a webhook to the app, then the app audits the PR diff and posts the result as a comment on that PR.
 
 **Ready-made test repo:** Use the folder **`clawaudit-auto-git-pr-test-repo/`** in this project. It contains a vulnerable Solidity contract and **SETUP.md** with step-by-step instructions to push it to GitHub as `clawaudit-auto-git-pr-test-repo` and open a PR to trigger the webhook.
 
