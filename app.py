@@ -1,20 +1,65 @@
 import streamlit as st
 import requests
-import random
+import os
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 # --- UI Configuration ---
-st.set_page_config(page_title="ClawAudit Enterprise", page_icon="🛡️", layout="wide")
+API_BASE = os.environ.get("CLAWAUDIT_API_BASE", "http://127.0.0.1:8000")
+st.set_page_config(page_title="ClawAudit Sentinel", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
 
+# --- Custom CSS: cleaner layout, cards, spacing ---
+st.markdown("""
+<style>
+    /* Header and typography */
+    .main .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1400px; }
+    h1 { font-weight: 700; letter-spacing: -0.02em; color: #0f172a; }
+    h2, h3 { font-weight: 600; color: #1e293b; margin-top: 1.25em; }
+    /* Subtle card-style sections */
+    div[data-testid="stVerticalBlock"] > div:has(> div[data-testid="stMarkdown"]) {
+        border-radius: 8px;
+    }
+    /* Metric/card highlight */
+    [data-testid="stMetricValue"] { font-weight: 600; }
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] { gap: 4px; }
+    .stTabs [data-baseweb="tab"] { padding: 0.6rem 1rem; font-weight: 500; border-radius: 6px; }
+    .stTabs [aria-selected="true"] { background: #f1f5f9; }
+    /* Buttons */
+    .stButton > button { border-radius: 6px; font-weight: 500; }
+    .stButton > button[kind="primary"] { background: #0f172a; }
+    /* Code blocks */
+    code { background: #f1f5f9; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    /* Expander */
+    .streamlit-expanderHeader { font-weight: 500; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- Sidebar: project guide & deploy ---
+with st.sidebar:
+    st.markdown("### 📖 Project guide")
+    st.caption("How this project works and what OpenClaw does:")
+    st.markdown("**PROJECT_GUIDE.md** — API vs UI vs agent, flows, where to change behavior.")
+    st.markdown("---")
+    st.markdown("### 🚀 Deploy (open-source)")
+    st.caption("Where and how to run this outside localhost:")
+    st.markdown("**DEPLOY.md** — Railway, Render, Fly.io, VPS, Streamlit Cloud; env vars; GitHub webhook.")
+
+# --- Header ---
 st.title("🛡️ ClawAudit Sentinel")
-st.markdown("**Autonomous Web3 DevSecOps Agent.** Powered by OpenClaw & Gemini.")
+st.markdown("**Autonomous Web3 DevSecOps** — AI-powered smart contract audits, attestation, and auto-remediation. Built on **OpenClaw** and **Gemini**.")
 st.markdown("---")
 
-# --- Create Tabs: One for the tech demo, one for the business pitch ---
-tab1, tab2 = st.tabs(["🔍 Live AI Scanner (Demo)", "💼 Enterprise API (Monetization)"])
+# --- Create Tabs: Scanner, GitHub, Enterprise ---
+tab1, tab2_github, tab2 = st.tabs(["🔍 Live AI Scanner (Demo)", "🔗 GitHub", "💼 Enterprise API (Monetization)"])
 
 with tab1:
     st.subheader("🧪 Test Suite")
-    st.write("Select a historical exploit to test the agent, or paste your own code.")
+    st.write("Select a historical exploit, paste your own code, or **fetch verified source** by contract address.")
 
     test_contracts = {
         "Custom Code": "",
@@ -36,28 +81,140 @@ contract VulnerableBank {
 }"""
     }
 
-    selected_test = st.selectbox("Load Test Contract:", options=list(test_contracts.keys()))
+    selected_test = st.selectbox("Load Test Contract:", options=list(test_contracts.keys()), key="scanner_preset")
+
+    default_code = test_contracts[selected_test]
+    if "scanner_code_input" not in st.session_state:
+        st.session_state["scanner_code_input"] = default_code
+    if st.session_state.get("scanner_preset_prev") != selected_test:
+        st.session_state["scanner_preset_prev"] = selected_test
+        st.session_state["scanner_code_input"] = default_code
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("### 📝 Smart Contract Source")
-        default_code = test_contracts[selected_test]
-        contract_code = st.text_area("Solidity Code", value=default_code, height=400, label_visibility="collapsed")
+        st.text_area("Solidity Code", height=400, label_visibility="collapsed", key="scanner_code_input")
+
+        # Fetch verified source by address (Etherscan / Basescan)
+        st.caption("Or fetch verified source by contract address (EVM chains):")
+        fetch_col1, fetch_col2 = st.columns([2, 1])
+        with fetch_col1:
+            fetch_address = st.text_input("Contract address", placeholder="0x...", key="fetch_addr", label_visibility="collapsed")
+        with fetch_col2:
+            fetch_clicked = st.button("Fetch verified source", type="secondary", use_container_width=True)
+        if fetch_clicked and fetch_address.strip():
+            with st.spinner("Fetching verified source from Etherscan/Basescan..."):
+                try:
+                    api_key = os.environ.get("ETHERSCAN_API_KEY", "")
+                    # Try Etherscan first
+                    r = requests.get(
+                        "https://api.etherscan.io/api",
+                        params={"module": "contract", "action": "getsourcecode", "address": fetch_address.strip(), **({"apikey": api_key} if api_key else {})},
+                        timeout=10,
+                    )
+                    data = r.json()
+                    if data.get("status") == "1" and data.get("result") and len(data["result"]) > 0:
+                        src = data["result"][0].get("SourceCode", "").strip()
+                        if src.startswith("{{"):
+                            import json
+                            try:
+                                parsed = json.loads(src)
+                                if isinstance(parsed, dict):
+                                    parts = []
+                                    for k, v in sorted(parsed.items()):
+                                        if isinstance(v, dict) and "content" in v:
+                                            parts.append(f"// {k}\n{v['content']}")
+                                        elif isinstance(v, str):
+                                            parts.append(f"// {k}\n{v}")
+                                    src = "\n\n".join(parts) if parts else src
+                                else:
+                                    src = str(parsed)
+                            except Exception:
+                                pass
+                        if src:
+                            st.session_state["scanner_code_input"] = src
+                            st.success("Source loaded. You can edit above and click **Initialize Sentinel Scan**.")
+                            st.rerun()
+                        else:
+                            st.warning("No source code returned for this address (unverified contract?). Try Basescan for Base chain.")
+                    else:
+                        # Try Basescan
+                        r2 = requests.get(
+                            "https://api.basescan.org/api",
+                            params={"module": "contract", "action": "getsourcecode", "address": fetch_address.strip(), **({"apikey": os.environ.get("BASESCAN_API_KEY", "")} if os.environ.get("BASESCAN_API_KEY") else {})},
+                            timeout=10,
+                        )
+                        d2 = r2.json()
+                        if d2.get("status") == "1" and d2.get("result") and len(d2["result"]) > 0:
+                            src = d2["result"][0].get("SourceCode", "").strip()
+                            if src:
+                                st.session_state["scanner_code_input"] = src
+                                st.success("Source loaded from Basescan. Edit above and click **Initialize Sentinel Scan**.")
+                                st.rerun()
+                        st.warning("Could not fetch source for this address (unverified or wrong chain?). Paste Solidity code manually.")
+                except Exception as e:
+                    st.error(f"Fetch failed: {e}")
 
     with col2:
         st.markdown("### 🧠 AI Auditor Analysis")
+        scan_type_ui = st.selectbox("Scan type (Moltbook receipt style)", options=["manual", "demo", "full"], index=0, key="scan_type_ui", help="Manual / demo / full — the agent posts a scan-type-specific cryptic receipt to Moltbook.")
         contract_address_optional = st.text_input("Contract address (optional)", placeholder="0x... (for attestation by address)", key="addr")
+
+        with st.expander("🔑 Test credentials (optional)", expanded=False):
+            st.caption("Override backend env for this run. Leave empty to use server .env. Use for testing without changing server config.")
+            test_telegram_token = st.text_input("Telegram Bot Token", type="password", placeholder="Bot token from @BotFather", key="test_telegram_token")
+            test_telegram_chat = st.text_input("Telegram Chat ID", type="default", placeholder="e.g. -1001234567890", key="test_telegram_chat")
+            test_moltbook_key = st.text_input("Moltbook API Key", type="password", placeholder="Moltbook API key", key="test_moltbook_key")
+            test_moltbook_submolt = st.text_input("Moltbook Submolt", value="lablab", placeholder="lablab", key="test_moltbook_submolt")
+
         if st.button("🚀 Initialize Sentinel Scan", use_container_width=True, type="primary"):
-            if contract_code.strip() == "":
-                st.warning("Please enter or select a smart contract to scan.")
+            code_to_scan = (st.session_state.get("scanner_code_input") or "").strip()
+            addr = (contract_address_optional or "").strip()
+            # If only address is filled, try to fetch source and scan in one go
+            if not code_to_scan and addr:
+                with st.spinner("Fetching verified source from address..."):
+                    try:
+                        api_key = os.environ.get("ETHERSCAN_API_KEY", "")
+                        r = requests.get("https://api.etherscan.io/api", params={"module": "contract", "action": "getsourcecode", "address": addr, **({"apikey": api_key} if api_key else {})}, timeout=10)
+                        data = r.json()
+                        if data.get("status") == "1" and data.get("result") and len(data["result"]) > 0:
+                            src = data["result"][0].get("SourceCode", "").strip()
+                            if src.startswith("{{"):
+                                try:
+                                    import json
+                                    parsed = json.loads(src)
+                                    if isinstance(parsed, dict):
+                                        parts = [f"// {k}\n{v.get('content', v) if isinstance(v, dict) else v}" for k, v in sorted(parsed.items())]
+                                        src = "\n\n".join(parts) if parts else src
+                                except Exception:
+                                    pass
+                            if src:
+                                code_to_scan = src
+                        if not code_to_scan:
+                            r2 = requests.get("https://api.basescan.org/api", params={"module": "contract", "action": "getsourcecode", "address": addr, **({"apikey": os.environ.get("BASESCAN_API_KEY", "")} if os.environ.get("BASESCAN_API_KEY") else {})}, timeout=10)
+                            d2 = r2.json()
+                            if d2.get("status") == "1" and d2.get("result") and len(d2["result"]) > 0:
+                                code_to_scan = d2["result"][0].get("SourceCode", "").strip() or None
+                    except Exception:
+                        pass
+            if not code_to_scan:
+                st.warning("**Source code is required to scan.** Paste Solidity code above, select a test contract, use **Fetch verified source**, or paste a **contract address** (verified on Etherscan/Basescan) and click Scan.")
             else:
                 with st.spinner("Agent is running symbolic execution and logic flow analysis..."):
                     try:
-                        payload = {"contract_code": contract_code}
-                        if contract_address_optional.strip():
-                            payload["contract_address"] = contract_address_optional.strip()
-                        res = requests.post("http://127.0.0.1:8000/scan", json=payload)
+                        payload = {"contract_code": code_to_scan, "scan_type": scan_type_ui}
+                        if addr:
+                            payload["contract_address"] = addr
+                        if (st.session_state.get("test_telegram_token") or "").strip():
+                            payload["telegram_bot_token"] = (st.session_state.get("test_telegram_token") or "").strip()
+                        if (st.session_state.get("test_telegram_chat") or "").strip():
+                            payload["telegram_chat_id"] = (st.session_state.get("test_telegram_chat") or "").strip()
+                        if (st.session_state.get("test_moltbook_key") or "").strip():
+                            payload["moltbook_api_key"] = (st.session_state.get("test_moltbook_key") or "").strip()
+                        if (st.session_state.get("test_moltbook_submolt") or "").strip():
+                            payload["moltbook_submolt"] = (st.session_state.get("test_moltbook_submolt") or "").strip()
+                        res = requests.post(f"{API_BASE}/scan", json=payload)
                         if res.status_code == 200:
                             data = res.json()
                             if data.get("status") == "error":
@@ -69,12 +226,16 @@ contract VulnerableBank {
                                     with st.expander("🔗 Audit attestation (verifiable proof)", expanded=True):
                                         st.json(data["proof"])
                                         st.caption("Anyone can verify: GET /audit-proof?code_hash=" + data["proof"].get("code_hash", "")[:16] + "...")
+                                if data.get("agent_stderr"):
+                                    with st.expander("⚠️ Agent log (if Telegram/Moltbook didn’t post, check here)", expanded=False):
+                                        st.code(data["agent_stderr"], language="text")
+                                        st.caption("If you see 'Telegram credentials missing' or Moltbook errors, set TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID and MOLTBOOK_API_KEY in .env and restart the backend.")
                             st.markdown("### 📄 Report")
                             st.markdown(data.get("output", "No output generated."))
                         else:
                             st.error(f"Backend error: {res.text}")
                     except Exception as e:
-                        st.error(f"Connection failed: {e}. Is the FastAPI backend running on http://127.0.0.1:8000 ?")
+                        st.error(f"Connection failed: {e}. Is the FastAPI backend running on {API_BASE} ?")
     st.markdown("---")
     st.subheader("🔍 Verify an audit (open attestation)")
     st.caption("Anyone can check if code or a contract was audited by ClawAudit — the one open channel for audit proof.")
@@ -93,7 +254,7 @@ contract VulnerableBank {
             if not params:
                 st.warning("Enter a code hash or contract address.")
             else:
-                r = requests.get("http://127.0.0.1:8000/audit-proof", params=params)
+                r = requests.get(f"{API_BASE}/audit-proof", params=params)
                 if r.status_code == 200:
                     st.success("Attestation found — this code/contract was audited by ClawAudit.")
                     st.json(r.json())
@@ -102,31 +263,145 @@ contract VulnerableBank {
         except Exception as e:
             st.error(str(e))
 
-with tab2:
-    st.subheader("🏢 B2B API Monetization Dashboard")
-    st.write("Developers can integrate ClawAudit directly into their GitHub Actions. Billed via Stripe.")
-    
-    col3, col4, col5 = st.columns(3)
-    col3.metric(label="API Scans This Month", value="1,204", delta="+12%")
-    col4.metric(label="Cost Per Scan", value="$50.00", delta="Flat Rate")
-    col5.metric(label="Estimated Unbilled Revenue", value="$60,200", delta="+12%")
-    
+with tab2_github:
+    st.subheader("🔗 GitHub integration")
+    st.write("Connect your repo so **Pull Requests** get an automatic security audit comment from ClawAudit.")
     st.markdown("---")
-    st.markdown("### 🔑 Your Production API Keys")
-    st.code("sk_live_clawaudit_7x9pQ2mN4vL8wK1jR5tY3", language="bash")
-    
-    st.markdown("### 💻 Example GitHub Actions Integration")
+
+    # --- Create remediation PR (credentials + initiate fix) ---
+    st.markdown("### 🚨 Create remediation PR (push fix to GitHub)")
+    st.caption("Enter GitHub credentials and patch details to open a PR with the fixed code on your repo. No local git required.")
+    with st.expander("GitHub credentials & patch details", expanded=True):
+        gh_token = st.text_input(
+            "GitHub token (Personal Access Token)",
+            type="password",
+            placeholder="ghp_... or paste token",
+            key="gh_remediation_token",
+            help="Token needs `repo` scope. Leave empty to use backend GITHUB_TOKEN from .env.",
+        )
+        repo_name = st.text_input(
+            "Repository",
+            placeholder="owner/repo",
+            key="gh_repo_name",
+            help="Full repo name, e.g. myorg/my-repo or username/repo.",
+        )
+        file_path = st.text_input(
+            "File path in repo",
+            placeholder="contracts/Vulnerable.sol",
+            key="gh_file_path",
+            help="Path to the vulnerable file that will be replaced with the patched code.",
+        )
+        vulnerability_title = st.text_input(
+            "Vulnerability title (for PR title)",
+            placeholder="Reentrancy in withdraw()",
+            key="gh_vuln_title",
+        )
+        patched_code = st.text_area(
+            "Patched code",
+            height=280,
+            placeholder="// Paste the fixed Solidity (or other) code from your OpenClaw audit result.",
+            key="gh_patched_code",
+        )
+    if st.button("🚀 Create remediation PR", type="primary", key="create_remediation_pr_btn"):
+        if not repo_name.strip():
+            st.warning("Enter repository (owner/repo).")
+        elif not file_path.strip():
+            st.warning("Enter the file path in the repo.")
+        elif not vulnerability_title.strip():
+            st.warning("Enter a vulnerability title for the PR.")
+        elif not patched_code.strip():
+            st.warning("Paste the patched code to push.")
+        else:
+            with st.spinner("Creating branch and opening PR via GitHub API..."):
+                try:
+                    payload = {
+                        "repo_name": repo_name.strip(),
+                        "file_path": file_path.strip(),
+                        "patched_code": patched_code.strip(),
+                        "vulnerability_title": vulnerability_title.strip(),
+                    }
+                    if gh_token.strip():
+                        payload["token"] = gh_token.strip()
+                    r = requests.post(f"{API_BASE.rstrip('/')}/remediation/create-pr", json=payload, timeout=30)
+                    if r.status_code == 200:
+                        data = r.json()
+                        st.success(f"PR created: **[#{data['number']}]({data['url']})** (branch: `{data['branch']}`)")
+                        st.balloons()
+                    else:
+                        err = r.json().get("detail", r.text) if r.headers.get("content-type", "").startswith("application/json") else r.text
+                        st.error(f"Failed to create PR: {err}")
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Request failed: {e}. Is the backend running on {API_BASE}?")
+                except Exception as e:
+                    st.error(str(e))
+
+    st.markdown("---")
+    webhook_url = f"{API_BASE.rstrip('/')}/webhook/github"
+    st.markdown("### Webhook URL")
+    st.code(webhook_url, language="text")
+    st.caption("Use this URL in your GitHub repo: **Settings → Webhooks → Add webhook**.")
+    st.markdown("---")
+    st.markdown("### Setup steps")
+    st.markdown("""
+    1. In your repo go to **Settings → Webhooks → Add webhook**.
+    2. **Payload URL:** paste the URL above (your API must be reachable from the internet for GitHub to call it; use a tunnel like ngrok for local testing).
+    3. **Content type:** `application/json`.
+    4. **Which events:** choose **Let me select individual events** → enable **Pull requests**.
+    5. Save. Add `GITHUB_TOKEN` to your backend `.env` (token needs `repo` scope and permission to write pull request comments).
+
+    When a PR is **opened** or **synchronized**, ClawAudit will audit the diff and post the result as a comment on the PR. A **PR-specific update** is also posted to your Moltbook submolt (e.g. "PR security review completed for repo PR #N").
+    """)
+    st.info("Backend must be running and `GITHUB_TOKEN` set in `.env` for comments to be posted.")
+    st.markdown("**How to test:** Create a repo → add a branch with Solidity code → open a Pull Request. The app will audit the diff and post a comment on the PR. See **TESTING_GITHUB.md** in the repo for step-by-step.")
+    st.markdown("---")
+    st.markdown("#### Public vs private repo")
+    st.caption("Both work. For **private** repos, the token must belong to an account that has access to the repo (or use a GitHub App with repo access).")
+
+with tab2:
+    st.subheader("🏢 Enterprise API & Project Overview")
+    st.markdown("ClawAudit exposes a **REST API** for scans, attestation, and GitHub auto-remediation. All core flows are implemented; integrate via API or use this UI as reference.")
+
+    st.markdown("---")
+    st.markdown("### 📡 API base & endpoints")
+    st.caption("Backend runs at the URL below. Full OpenAPI docs: **/docs** when the server is running.")
+    st.code(API_BASE, language="text")
+
+    st.markdown("""
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/scan` | POST | Submit Solidity code → AI audit report + attestation (optional Telegram + Moltbook receipt). |
+| `/audit-proof` | GET | Look up attestation by `code_hash` or `contract_address`. |
+| `/audit-trail` | GET | List recent attestations (`?limit=N`). |
+| `/remediation/create-pr` | POST | Create a PR with patched code (repo, file path, patched_code, vulnerability_title, optional token). |
+| `/webhook/github` | POST | **GitHub webhook:** on PR open/sync → audit diff → post comment; if 1 `.sol` + patched block → auto remediation PR. |
+| `/moltbook/post` | POST | Post a dev update to Moltbook submolt (body: `title`, `content`). |
+""")
+
+    st.markdown("---")
+    st.markdown("### 🔗 Project barebones (where everything lives)")
+    st.markdown("""
+- **Backend:** `main.py` — FastAPI app, scan orchestration, attestation registry, GitHub webhook, remediation PR logic.
+- **UI:** `app.py` — This Streamlit app (Scanner, GitHub, Enterprise tabs).
+- **Agent config:** `agent_config/` — OpenClaw config, skills (Moltbook, Telegram), model (e.g. Gemini). Agent runs in Docker via `docker compose`.
+- **Attestation store:** `data/audit_registry.json` — code_hash → proof (report_hash, timestamp, auditor).
+- **Docs:** `README.md` (quick start, env, commands), `TESTING_GITHUB.md` (webhook + PR test steps), `OPENCLAW_MEMORY.md` (agent memory), `PROJECT_GUIDE.md` (project sense + OpenClaw role).
+- **Contracts:** `contracts/` — e.g. ClawAuditRegistry.sol.
+    """)
+
+    st.markdown("---")
+    st.markdown("### 🔄 Flows at a glance")
+    with st.expander("Scan flow (Live AI Scanner tab)", expanded=False):
+        st.markdown("1. User pastes Solidity (or fetches by address). 2. **POST /scan** with `contract_code` (+ optional `contract_address`, `scan_type`). 3. Backend runs OpenClaw in Docker with a security-audit prompt. 4. Agent returns report; backend writes attestation to registry, returns report + proof. 5. Agent can post to Telegram (full report) and Moltbook (cryptic receipt).")
+    with st.expander("GitHub webhook flow (autonomous)", expanded=False):
+        st.markdown("1. Repo webhook points to **POST /webhook/github**. 2. On PR opened/synchronized, backend fetches PR diff via GitHub API. 3. OpenClaw audits the diff; backend posts the report as a PR comment. 4. If report contains **## Patched code** and PR touches **exactly one .sol file**, backend creates a **remediation PR** (new branch, patched file, PR to base). 5. Second comment on original PR links to the fix PR.")
+    with st.expander("Manual remediation PR (GitHub tab)", expanded=False):
+        st.markdown("User supplies repo, file path, vulnerability title, and **patched code** (e.g. from a prior scan). **POST /remediation/create-pr** creates branch `clawaudit-patch-{uuid}` from default branch, commits the patch, opens PR. No local git; GitHub API only.")
+
+    st.markdown("---")
+    st.markdown("### 💻 Example: call the scan API")
     st.code("""
-name: ClawAudit Sentinel CI
-on: [push]
-jobs:
-  security_scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Run OpenClaw AI Audit
-        run: |
-          curl -X POST https://api.clawaudit.com/v1/scan \\
-          -H "Authorization: Bearer ${{ secrets.CLAWAUDIT_API_KEY }}" \\
-          -d '{"repo": "contracts/"}'
-    """, language="yaml")
+curl -X POST """ + API_BASE.rstrip("/") + """/scan \\
+  -H "Content-Type: application/json" \\
+  -d '{"contract_code": "pragma solidity ^0.8.0; contract C { }", "scan_type": "manual"}'
+""", language="bash")
+    st.caption("Returns JSON: `status`, `output` (report), `proof` (code_hash, report_hash, timestamp), optional `agent_stderr`.")
