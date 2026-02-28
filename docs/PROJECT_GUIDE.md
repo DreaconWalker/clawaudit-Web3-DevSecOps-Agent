@@ -25,7 +25,7 @@ The “brain” of the audit is **OpenClaw** — an agent that runs in Docker an
 | **UI** | Streamlit app: Live Scanner, GitHub (creds + PR), Enterprise (API overview) | `app.py` |
 | **Agent** | OpenClaw in Docker: runs the actual audit from a prompt, can use Telegram/Moltbook skills | `agent_config/`, `docker-compose.yaml` |
 | **Data** | Attestation registry (code_hash → proof) | `data/audit_registry.json` (created at runtime) |
-| **Docs** | Setup, testing, memory, this guide | `README.md`, `TESTING_GITHUB.md`, `OPENCLAW_MEMORY.md`, `PROJECT_GUIDE.md` |
+| **Docs** | Setup, testing, memory, this guide | `README.md` (root), `docs/TESTING_GITHUB.md`, `docs/OPENCLAW_MEMORY.md`, `docs/PROJECT_GUIDE.md` |
 
 **Rough flow:** User or GitHub sends input → **main.py** receives it → **main.py** builds a prompt and runs **OpenClaw** in Docker → OpenClaw (Gemini) returns a report (and sometimes a “## Patched code” block) → **main.py** stores attestation, posts comments/PRs, returns JSON.
 
@@ -81,8 +81,8 @@ So in one sentence: **OpenClaw is the audit engine; this project is the orchestr
 - **Change UI (tabs, forms, copy):** `app.py`
 - **Change model or agent behavior:** `agent_config/openclaw.json` and prompts in `main.py`
 - **Change Telegram/Moltbook behavior:** `agent_config/skills/telegram`, `agent_config/skills/moltbook`, and the scan/webhook prompts in `main.py`
-- **Understand agent memory:** `OPENCLAW_MEMORY.md` and `agent_config/workspace/MEMORY.md`
-- **Test GitHub webhook + remediation PR:** `TESTING_GITHUB.md`
+- **Understand agent memory:** `docs/OPENCLAW_MEMORY.md` and `agent_config/workspace/MEMORY.md`
+- **Test GitHub webhook + remediation PR:** `docs/TESTING_GITHUB.md`
 
 ---
 

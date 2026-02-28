@@ -4,12 +4,12 @@
     "google:manual": {
       "type": "token",
       "provider": "google",
-      "token": "***REMOVED***"
+      "token": "AIzaSyBxF0nQ7P3Ves6QmzxCh30CWvIm82Almhg"
     },
     "google:default": {
       "type": "api_key",
       "provider": "google",
-      "key": "***REMOVED***"
+      "key": "AIzaSyBxF0nQ7P3Ves6QmzxCh30CWvIm82Almhg"
     }
   },
   "lastGood": {
@@ -17,7 +17,7 @@
   },
   "usageStats": {
     "google:manual": {
-      "lastUsed": 1772212321003,
+      "lastUsed": 1772257789636,
       "errorCount": 0
     }
   }

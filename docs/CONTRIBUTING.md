@@ -29,7 +29,7 @@ Thanks for your interest in contributing.
 
 ## Docs
 
-- Update `README.md` if you add endpoints or change run instructions.
+- Update `README.md` (project root) if you add endpoints or change run instructions.
 - Update `.env.example` if you add new env vars.
 
 ## License

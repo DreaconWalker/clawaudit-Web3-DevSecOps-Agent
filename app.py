@@ -43,11 +43,11 @@ st.markdown("""
 with st.sidebar:
     st.markdown("### 📖 Project guide")
     st.caption("How this project works and what OpenClaw does:")
-    st.markdown("**PROJECT_GUIDE.md** — API vs UI vs agent, flows, where to change behavior.")
+    st.markdown("**docs/PROJECT_GUIDE.md** — API vs UI vs agent, flows, where to change behavior.")
     st.markdown("---")
     st.markdown("### 🚀 Deploy (open-source)")
     st.caption("Where and how to run this outside localhost:")
-    st.markdown("**DEPLOY.md** — Railway, Render, Fly.io, VPS, Streamlit Cloud; env vars; GitHub webhook.")
+    st.markdown("**docs/DEPLOY.md** — Railway, Render, Fly.io, VPS, Streamlit Cloud; env vars; GitHub webhook.")
 
 # --- Header ---
 st.title("🛡️ ClawAudit Sentinel")
@@ -221,15 +221,15 @@ contract VulnerableBank {
                                 st.warning("Agent run completed with errors. Check logs below.")
                                 st.code(data.get("logs", ""), language="text")
                             else:
-                                st.success("✅ Audit complete. Results below. Detailed summary sent to Telegram; cryptic receipt posted to Moltbook.")
+                                st.success("✅ Audit complete. The agent was instructed to post to Telegram (full report) and to your configured Moltbook submolt (cryptic receipt). If either didn't appear, check the Agent log below.")
                                 if data.get("proof"):
                                     with st.expander("🔗 Audit attestation (verifiable proof)", expanded=True):
                                         st.json(data["proof"])
                                         st.caption("Anyone can verify: GET /audit-proof?code_hash=" + data["proof"].get("code_hash", "")[:16] + "...")
                                 if data.get("agent_stderr"):
-                                    with st.expander("⚠️ Agent log (if Telegram/Moltbook didn’t post, check here)", expanded=False):
+                                    with st.expander("⚠️ Agent log (Telegram/Moltbook errors show here)", expanded=True):
                                         st.code(data["agent_stderr"], language="text")
-                                        st.caption("If you see 'Telegram credentials missing' or Moltbook errors, set TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID and MOLTBOOK_API_KEY in .env and restart the backend.")
+                                        st.caption("If Moltbook didn't post: look for 'MOLTBOOK_API_KEY missing' or API errors. Set MOLTBOOK_API_KEY and MOLTBOOK_SUBMOLT in backend .env (or in Test credentials). Only the manual 'Post to submolt' form was removed from the GitHub tab; every scan still triggers autonomous posting to your configured submolt.")
                             st.markdown("### 📄 Report")
                             st.markdown(data.get("output", "No output generated."))
                         else:
@@ -352,7 +352,7 @@ with tab2_github:
     When a PR is **opened** or **synchronized**, ClawAudit will audit the diff and post the result as a comment on the PR. A **PR-specific update** is also posted to your Moltbook submolt (e.g. "PR security review completed for repo PR #N").
     """)
     st.info("Backend must be running and `GITHUB_TOKEN` set in `.env` for comments to be posted.")
-    st.markdown("**How to test:** Create a repo → add a branch with Solidity code → open a Pull Request. The app will audit the diff and post a comment on the PR. See **TESTING_GITHUB.md** in the repo for step-by-step.")
+    st.markdown("**How to test:** Create a repo → add a branch with Solidity code → open a Pull Request. The app will audit the diff and post a comment on the PR. See **docs/TESTING_GITHUB.md** in the repo for step-by-step.")
     st.markdown("---")
     st.markdown("#### Public vs private repo")
     st.caption("Both work. For **private** repos, the token must belong to an account that has access to the repo (or use a GitHub App with repo access).")
@@ -384,7 +384,7 @@ with tab2:
 - **UI:** `app.py` — This Streamlit app (Scanner, GitHub, Enterprise tabs).
 - **Agent config:** `agent_config/` — OpenClaw config, skills (Moltbook, Telegram), model (e.g. Gemini). Agent runs in Docker via `docker compose`.
 - **Attestation store:** `data/audit_registry.json` — code_hash → proof (report_hash, timestamp, auditor).
-- **Docs:** `README.md` (quick start, env, commands), `TESTING_GITHUB.md` (webhook + PR test steps), `OPENCLAW_MEMORY.md` (agent memory), `PROJECT_GUIDE.md` (project sense + OpenClaw role).
+- **Docs:** `README.md` (quick start, env, commands), `docs/TESTING_GITHUB.md` (webhook + PR test steps), `docs/OPENCLAW_MEMORY.md` (agent memory), `docs/PROJECT_GUIDE.md` (project sense + OpenClaw role).
 - **Contracts:** `contracts/` — e.g. ClawAuditRegistry.sol.
     """)
 

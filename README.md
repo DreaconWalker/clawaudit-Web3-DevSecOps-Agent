@@ -96,18 +96,20 @@ On **pull_request** with action `opened` or `synchronize`, the app fetches the P
 
 **Public vs private repo:** Both work. For **private** repos, `GITHUB_TOKEN` must belong to an account (or GitHub App) that has access to the repo.
 
-**How to test:** See **[TESTING_GITHUB.md](TESTING_GITHUB.md)** for a step-by-step (create repo → add contract code → open PR → app posts audit comment).
+**How to test:** See **[docs/TESTING_GITHUB.md](docs/TESTING_GITHUB.md)** for a step-by-step (create repo → add contract code → open PR → app posts audit comment).
 
 ---
 
 ## Moltbook submolt (hackathon requirement)
 
-Development updates must be posted to your Moltbook submolt. ClawAudit does this in two ways:
+**Autonomous posting is always on:** Every **scan** (UI or API) instructs the agent to post a cryptic receipt to your configured submolt. Only the *manual* "Post to submolt" form was removed from the GitHub tab; the scan flow still triggers Moltbook posting when `MOLTBOOK_API_KEY` and `MOLTBOOK_SUBMOLT` are set in `.env` (or passed in the request).
 
-1. **Scan-type-specific receipts** — When you run a **manual/demo/full** scan from the UI (or API with `scan_type`), the agent posts a cryptic receipt to your submolt that identifies the scan type. When a **GitHub PR** is audited, the backend posts a short PR-specific message to the submolt (e.g. "PR security review completed for repo PR #N").
-2. **Dev milestone updates** — Use **POST /moltbook/post** (or the **GitHub** tab → "Submolt dev updates" in the UI) to post free-form updates (e.g. "Week 1: API live", "GitHub integration complete"). This satisfies the hackathon requirement to keep the submolt updated with development progress.
+ClawAudit posts to Moltbook in two ways:
 
-Submolt name is set via `MOLTBOOK_SUBMOLT` in `.env` (default `lablab`).
+1. **Scan-type-specific receipts (autonomous)** — When you run a **manual/demo/full** scan, the agent posts a cryptic receipt to your submolt. When a **GitHub PR** is audited, the backend posts a short PR-specific message to the submolt (e.g. "PR security review completed for repo PR #N").
+2. **Dev milestone updates** — Use **POST /moltbook/post** (e.g. via API or curl) with body `title` and `content` to post free-form updates (e.g. "Week 1: API live", "GitHub integration complete").
+
+Submolt name is set via `MOLTBOOK_SUBMOLT` in `.env` (default `lablab`). If a scan completes but nothing appears on Moltbook, check the **Agent log** in the UI (or backend logs) for `MOLTBOOK_API_KEY missing` or API errors, and confirm your `.env` has valid `MOLTBOOK_API_KEY` and `MOLTBOOK_SUBMOLT`.
 
 ---
 
@@ -128,10 +130,13 @@ surge-hackathon/
 ├── data/                # Created at runtime
 │   └── audit_registry.json
 ├── contracts/          # Solidity (e.g. ClawAuditRegistry)
-├── TUI_SETUP.md         # OpenClaw TUI + env troubleshooting
-├── AUDIT_LOGS_AND_MODEL.md
-├── MOLTBOOK_SETUP.md
-├── CONTRIBUTING.md
+├── docs/               # Additional documentation
+│   ├── TESTING_GITHUB.md
+│   ├── PROJECT_GUIDE.md
+│   ├── DEPLOY.md
+│   ├── OPENCLAW_MEMORY.md
+│   ├── CONTRIBUTING.md
+│   └── ...
 ├── LICENSE
 └── README.md
 ```
@@ -146,4 +151,4 @@ MIT. See [LICENSE](LICENSE).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run the stack, report issues, and submit changes.
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for how to run the stack, report issues, and submit changes.
